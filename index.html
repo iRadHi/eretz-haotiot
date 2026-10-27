@@ -282,6 +282,9 @@ select{width:auto;min-width:130px;text-align:right}
 .opt.dragging{opacity:.3}
 .drag-ghost{position:fixed;z-index:200;pointer-events:none;margin:0;box-sizing:border-box;transform:scale(1.1) rotate(-4deg);box-shadow:0 12px 22px rgba(31,43,71,.3);border-color:var(--sun)}
 .opt.used{opacity:.3}
+.tracecv{display:block;background:#fff;border-radius:22px;box-shadow:inset 0 0 0 3px var(--line);touch-action:none;cursor:crosshair}
+.opt.trace-clear{grid-column:1/-1;font:400 22px var(--font-display);min-height:56px}
+.opt[hidden]{display:none}
 .hl{font:700 clamp(42px,12vw,58px)/1 'Noto Sans Hebrew','Rubik',sans-serif}
 .bigspk{width:104px;height:104px;border-radius:50%;border:0;background:var(--blue);font-size:48px;box-shadow:0 7px 0 var(--blue-d);padding:0}
 .bigspk:active{transform:translateY(4px);box-shadow:0 3px 0 var(--blue-d)}
@@ -653,9 +656,9 @@ function seeded(seed){var s=seed>>>0||1;return function(){s=(s*1664525+101390422
 var KEY='masa-hamisparim-v1';
 var storageOK=true;
 var DEF={max:10,ramp:'normal',perWorld:15,qStart:5,qEnd:10,heartsStart:4,heartsEnd:2,
-  types:{count:1,vcompare:1,ncompare:1,sign:1,order:1,tens:1,add:1,sub:1,missing:0,mul:0,div:0,shape:1},
+  types:{count:1,vcompare:1,ncompare:1,sign:1,order:1,tens:1,add:1,sub:1,missing:0,mul:0,div:0,shape:1,write:1},
   dots:1,sound:1,speak:1,gate:1,adapt:1,memPairs:0,
-  read:1,rtypes:{rword:1,rpic:1,rsent:1,rspic:1,rsyl:1,rfirst:1,rrhyme:1},
+  read:1,rtypes:{rword:1,rpic:1,rsent:1,rspic:1,rsyl:1,rfirst:1,rrhyme:1,rwrite:1},
   nikud:{a:1,e:0,i:0,oh:0,om:0,u1:0,u2:0,shva:0,hataf:0},finals:1};
 function fresh(){return {v:1,name:'',avatar:null,coins:0,done:0,stars:{},owned:{acc:[],bg:['grass']},equip:{head:null,face:null,neck:null,bg:'grass'},growth:0,stats:{},track:'math',prog:{},mood:{},pet:null,sayNext:null,
   stickers:{},friends:[],growthBy:{},hunger:0,tickets:1,daily:{},streak:{n:0,last:'',best:0},ach:{},surp:{},
@@ -731,7 +734,7 @@ var ROOMS=[{id:'grass',name:'דשא',price:0,tile:'t_grass'},{id:'sand',name:'ח
 function worldTheme(w){var b=WORLDS[w%WORLDS.length];var r=Math.floor(w/WORLDS.length);return {id:b.id,name:b.name+(r?' '+(r+1):''),tile:b.tile,path:b.path,deco:b.deco}}
 var ITEMS=['star','coin','red','blue','green'];
 var NAMES={count:'ספירה',vcompare:'השוואת כמויות',ncompare:'גדול וקטן',sign:'גדול, קטן או שווה',order:'סדר המספרים',tens:'עשרות ויחידות',add:'חיבור',sub:'חיסור',missing:'מספר חסר',mul:'כפל',div:'חילוק',shape:'צורות',
-  rword:'סמנו את המילה',rpic:'מה בתמונה',rsent:'השלמת משפט',rspic:'משפט ותמונה',rsyl:'הרכבת מילה',rfirst:'אות פותחת',rrhyme:'מילה מתחרזת'};
+  rword:'סמנו את המילה',rpic:'מה בתמונה',rsent:'השלמת משפט',rspic:'משפט ותמונה',rsyl:'הרכבת מילה',rfirst:'אות פותחת',rrhyme:'מילה מתחרזת',write:'כתיבת מספרים',rwrite:'כתיבת אותיות'};
 
 /* ---------- avatar ---------- */
 function avatarHTML(id,size,noAcc){
@@ -992,6 +995,7 @@ function weights(p){
   if(T.mul)w.mul=1.6;
   if(T.div)w.div=1.4;
   if(T.shape)w.shape=1.3;
+  if(T.write)w.write=1.1;
   if(!Object.keys(w).length){w.add=1;w.sub=1}
   if(S.set.adapt)Object.keys(w).forEach(function(k){w[k]*=SKILL_W[skillLevel(k)]});
   return w;
@@ -1047,6 +1051,8 @@ function nextQuestion(){
   var o=$('#lv-opts');o.className='pad'+(q.layout==='g3'?' g3':'');o.id='lv-opts';
   o.innerHTML=q.options.map(function(op,i){return '<button class="opt'+(q.layout==='grp'?' grp':'')+'" data-act="answer" data-i="'+i+'">'+op.html+'</button>'}).join('');
   if(q.seq)$$('#lv-opts .opt').forEach(function(b){b.classList.add('dragable')});
+  TR=null;
+  if(q.trace){$$('#lv-opts .opt').forEach(function(b){b.hidden=true});o.insertAdjacentHTML('beforeend','<button class="opt trace-clear" data-act="trace-clear">🧽 מחיקה</button>');initTrace(q)}
   if(q.layout==='grp')$$('#lv-opts .opt').forEach(function(b,i){b.setAttribute('aria-label',q.options[i].label||'קבוצה של '+q.options[i].value)});
   speakText(q.say,q.forceSay);
 }
@@ -1477,10 +1483,109 @@ function bossHit(){
   var d=document.createElement('div');d.className='dmg';d.textContent='-1';d.style.left='60px';d.style.top='0';$('#lv-boss').appendChild(d);later(800,function(){d.remove()});
 }
 
+/* ---------- writing: trace a dotted letter or number ---------- */
+// The dotted guide comes from the font itself: the glyph is drawn on a small grid, thinned to a one-pixel
+// centerline, and dots are spread evenly along it. Any letter or number works without hand-drawn paths.
+var TG=72,TRACE_CACHE={},TR=null;
+var LETTER_NAMES={'א':'אלף','ב':'בית','ג':'גימל','ד':'דלת','ה':'הא','ו':'וו','ז':'זין','ח':'חית','ט':'טית','י':'יוד','כ':'כף','ל':'למד','מ':'מם','נ':'נון','ס':'סמך','ע':'עין','פ':'פא','צ':'צדי','ק':'קוף','ר':'ריש','ש':'שין','ת':'תו',
+  'ך':'כף סופית','ם':'מם סופית','ן':'נון סופית','ף':'פא סופית','ץ':'צדי סופית'};
+function traceFont(px){return '500 '+px+'px "Noto Sans Hebrew","Rubik",sans-serif'}
+function traceFit(x,text){ // font size and position that fit the glyph's real outline inside the grid
+  x.direction='ltr';x.textAlign='left';x.textBaseline='alphabetic'; /* the page is RTL; measure and draw left-to-right in both canvases */
+  var px=100;x.font=traceFont(px);var m=x.measureText(text);
+  var w=m.actualBoundingBoxLeft+m.actualBoundingBoxRight,h=m.actualBoundingBoxAscent+m.actualBoundingBoxDescent,k=Math.min(TG*.78/w,TG*.78/h);
+  // keep natural proportions: size by a regular character so a yod stays small and a lamed keeps its ascender
+  var rm=x.measureText(/[0-9]/.test(text)?'0':'ש'),rh=rm.actualBoundingBoxAscent+rm.actualBoundingBoxDescent;k=Math.min(k,TG*.6/rh);
+  px=px*k;x.font=traceFont(px);m=x.measureText(text);
+  w=m.actualBoundingBoxLeft+m.actualBoundingBoxRight;h=m.actualBoundingBoxAscent+m.actualBoundingBoxDescent;
+  return {px:px,x:(TG-w)/2+m.actualBoundingBoxLeft,y:(TG-h)/2+m.actualBoundingBoxAscent};
+}
+function thin(m){ // Zhang-Suen thinning on the TG x TG grid
+  var G=TG,ch=true,P=function(x,y){return x<0||y<0||x>=G||y>=G?0:m[y*G+x]};
+  while(ch){ch=false;
+    for(var pass=0;pass<2;pass++){var del=[];
+      for(var y=0;y<G;y++)for(var x=0;x<G;x++){if(!m[y*G+x])continue;
+        var n=[P(x,y-1),P(x+1,y-1),P(x+1,y),P(x+1,y+1),P(x,y+1),P(x-1,y+1),P(x-1,y),P(x-1,y-1)],b=0,a=0;
+        for(var i=0;i<8;i++){b+=n[i];if(!n[i]&&n[(i+1)%8])a++}
+        if(b<2||b>6||a!==1)continue;
+        if(pass===0?(n[0]*n[2]*n[4]===0&&n[2]*n[4]*n[6]===0):(n[0]*n[2]*n[6]===0&&n[0]*n[4]*n[6]===0))del.push(y*G+x)}
+      del.forEach(function(i){m[i]=0});if(del.length)ch=true}}
+  return m;
+}
+function traceGlyph(text){
+  if(TRACE_CACHE[text])return TRACE_CACHE[text];
+  var c=document.createElement('canvas');c.width=c.height=TG;var x=c.getContext('2d'),f=traceFit(x,text);
+  x.fillStyle='#000';x.fillText(text,f.x,f.y);
+  var d=x.getImageData(0,0,TG,TG).data,m=new Uint8Array(TG*TG);for(var i=0;i<TG*TG;i++)m[i]=d[i*4+3]>110?1:0;
+  thin(m);
+  var sk=[];for(var y=0;y<TG;y++)for(var xx=0;xx<TG;xx++)if(m[y*TG+xx])sk.push([xx,y]);
+  var dots=[];sk.forEach(function(p){if(dots.every(function(q){return (q[0]-p[0])*(q[0]-p[0])+(q[1]-p[1])*(q[1]-p[1])>=9})) dots.push(p)}); // a dot every ~3 grid units
+  // distance from the centerline, for judging whether the finger stayed on the letter
+  var dist=new Float32Array(TG*TG).fill(99),qu=[];sk.forEach(function(p){dist[p[1]*TG+p[0]]=0;qu.push(p)});
+  for(var h=0;h<qu.length;h++){var p=qu[h],dv=dist[p[1]*TG+p[0]];[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(o){var nx=p[0]+o[0],ny=p[1]+o[1];if(nx<0||ny<0||nx>=TG||ny>=TG)return;var ii=ny*TG+nx;if(dist[ii]>dv+1){dist[ii]=dv+1;qu.push([nx,ny])}})}
+  return TRACE_CACHE[text]={text:text,fit:f,dots:dots,dist:dist};
+}
+function initTrace(q){
+  var host=$('#lv-visual'),cv=$('#tracecv');if(!cv)return;
+  var S2=Math.floor(Math.min(host.clientWidth-8,host.clientHeight-8,340)),dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(S2*dpr);cv.height=Math.round(S2*dpr);cv.style.width=S2+'px';cv.style.height=S2+'px';
+  var ctx=cv.getContext('2d');ctx.setTransform(dpr*S2/TG,0,0,dpr*S2/TG,0,0);
+  TR={q:q,g:traceGlyph(q.trace),cv:cv,ctx:ctx,S:S2,strokes:[],cur:null,hit:{},ink:0,done:false};
+  traceDraw();
+}
+function traceDraw(){
+  var t=TR,c=t.ctx,g=t.g;c.clearRect(0,0,TG,TG);
+  c.direction='ltr';c.textAlign='left';c.textBaseline='alphabetic';
+  c.fillStyle='#EAF2FA';c.font=traceFont(g.fit.px);c.fillText(g.text,g.fit.x,g.fit.y); // faint letter
+  g.dots.forEach(function(p,i){c.beginPath();c.arc(p[0]+.5,p[1]+.5,t.hit[i]?1.25:1.05,0,Math.PI*2);c.fillStyle=t.hit[i]?'#4CBF5F':'#8FA3BF';c.fill()});
+  c.lineCap='round';c.lineJoin='round';c.lineWidth=3.2;c.strokeStyle=t.done?'#4CBF5F':'rgba(47,160,234,.85)';
+  t.strokes.concat(t.cur?[t.cur]:[]).forEach(function(s){if(!s.length)return;c.beginPath();c.moveTo(s[0][0],s[0][1]);
+    if(s.length===1)c.lineTo(s[0][0]+.01,s[0][1]);for(var i=1;i<s.length;i++)c.lineTo(s[i][0],s[i][1]);c.stroke()});
+}
+function tracePt(e){var r=TR.cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width*TG,(e.clientY-r.top)/r.height*TG]}
+function traceMark(p){ // dots near the finger turn green
+  TR.g.dots.forEach(function(d,i){if(!TR.hit[i]&&(d[0]-p[0])*(d[0]-p[0])+(d[1]-p[1])*(d[1]-p[1])<=4.6*4.6)TR.hit[i]=1});
+}
+function traceScore(){
+  var g=TR.g,n=g.dots.length,hit=Object.keys(TR.hit).length,pts=0,ok=0;
+  TR.strokes.forEach(function(s){s.forEach(function(p){var x=Math.round(p[0]),y=Math.round(p[1]);pts++;if(x>=0&&y>=0&&x<TG&&y<TG&&g.dist[y*TG+x]<=6)ok++})});
+  return {cover:n?hit/n:0,acc:pts?ok/pts:0};
+}
+function traceCheck(){
+  var sc=traceScore();
+  if(sc.cover>=.85&&sc.acc>=.7){TR.done=true;traceDraw();Snd.star(2);later(350,function(){answer(0)});return}
+  // a lot of scribbling that doesn't follow the letter counts as a try
+  if(TR.ink>Math.max(60,TR.g.dots.length*3*3.2)){
+    answer(1);var t=TR;later(600,function(){if(TR===t){t.strokes=[];t.hit={};t.ink=0;traceDraw()}});
+  }
+}
+document.addEventListener('pointerdown',function(e){
+  if(!TR||TR.done||e.target!==TR.cv||!L||L.locked)return;e.preventDefault();
+  var p=tracePt(e);TR.cur=[p];TR.pid=e.pointerId;traceMark(p);traceDraw();
+});
+document.addEventListener('pointermove',function(e){
+  if(!TR||!TR.cur||e.pointerId!==TR.pid)return;
+  var p=tracePt(e),l=TR.cur[TR.cur.length-1],d=Math.hypot(p[0]-l[0],p[1]-l[1]);if(d<.6)return;
+  TR.cur.push(p);TR.ink+=d;traceMark(p);traceDraw();
+});
+function traceEnd(e){if(!TR||!TR.cur||e.pointerId!==TR.pid)return;TR.strokes.push(TR.cur);TR.cur=null;traceDraw();if(!TR.done&&L&&!L.locked)traceCheck()}
+document.addEventListener('pointerup',traceEnd);
+document.addEventListener('pointercancel',traceEnd);
+function gWrite(p){ // numbers: single digits first, then up to 20
+  var top=p.t>.6?Math.min(20,Math.max(10,p.cap)):9,n=rnd(0,top),s=String(n);
+  return {type:'write',trace:s,prompt:'עקבו באצבע על המספר '+s,say:'עקבו באצבע על המספר '+s,text:'כתיבה: '+s,
+    visual:'<canvas class="tracecv" id="tracecv" aria-label="מספר לעקוב עליו"></canvas>',options:[{value:'ok',html:''},{value:'bad',html:''}],answer:'ok',key:'w'+s};
+}
+function gRWrite(p){
+  var pool=ALEF.split('').concat(S.set.finals?FINALS.split(''):[]),ch=pick(pool),nm=LETTER_NAMES[ch]||ch;
+  return {type:'rwrite',trace:ch,prompt:'עקבו באצבע על האות '+ch,say:'עקבו באצבע על האות '+nm,text:'כתיבה: '+ch,
+    visual:'<canvas class="tracecv" id="tracecv" aria-label="אות לעקוב עליה"></canvas>',options:[{value:'ok',html:''},{value:'bad',html:''}],answer:'ok',key:'rw_'+ch};
+}
+
 /* ---------- fair answer placement ---------- */
 // keeps the correct answer's position balanced within a level without a predictable cycle
 function placeAnswer(q){
-  if(q.layout==='g3'||q.seq)return; // the > < = keypad and syllable tiles keep their own order
+  if(q.layout==='g3'||q.seq||q.trace)return; // the > < = keypad and syllable tiles keep their own order
   var n=q.options.length;if(!L.posCnt)L.posCnt=[];
   for(var i=0;i<n;i++)L.posCnt[i]=L.posCnt[i]||0;
   var min=Math.min.apply(null,L.posCnt.slice(0,n)),cand=[];
@@ -1841,7 +1946,7 @@ function gRRhyme(p){
     options:wOpts([ans].concat(d)),answer:ans.w,key:'rr'+t.w};
 }
 var RTYPEDESC={rword:['סמנו את המילה','שומעים מילה ומסמנים אותה'],rpic:['מה בתמונה','רואים תמונה ובוחרים מילה'],rsent:['השלמת משפט','בוחרים את המילה החסרה'],
-  rspic:['משפט ותמונה','קוראים משפט ובוחרים תמונה'],rsyl:['הרכבת מילה','מסדרים הברות לפי הסדר'],rfirst:['אות פותחת','באיזו אות מתחילה המילה'],rrhyme:['מילה מתחרזת','מוצאים מילה שמתחרזת']};
+  rspic:['משפט ותמונה','קוראים משפט ובוחרים תמונה'],rsyl:['הרכבת מילה','מסדרים הברות לפי הסדר'],rfirst:['אות פותחת','באיזו אות מתחילה המילה'],rrhyme:['מילה מתחרזת','מוצאים מילה שמתחרזת'],rwrite:['כתיבת אותיות','עוקבים באצבע על אות מקווקוות']};
 function rWeights(p){
   var T=S.set.rtypes,t=p.t,w={};
   if(T.rword&&rAvail('rword'))w.rword=1.4;
@@ -1851,6 +1956,7 @@ function rWeights(p){
   if(T.rsyl&&rAvail('rsyl'))w.rsyl=1;
   if(T.rfirst&&rAvail('rfirst'))w.rfirst=1.4-.8*t;
   if(T.rrhyme&&rAvail('rrhyme'))w.rrhyme=.8;
+  if(T.rwrite)w.rwrite=1.2;
   if(!Object.keys(w).length)w.rfirst=1; // first-letter questions don't depend on the vowel settings
   return w;
 }
@@ -1863,11 +1969,11 @@ function setTrack(t){
   S.done=p.done;S.stars=p.stars;S.surp=p.surp;S.track=t;viewWorld=Math.floor(S.done/S.set.perWorld);save();
 }
 
-GEN.rword=gRWord;GEN.rpic=gRPic;GEN.rsent=gRSent;GEN.rspic=gRSPic;GEN.rsyl=gRSyl;GEN.rfirst=gRFirst;GEN.rrhyme=gRRhyme;
+GEN.write=gWrite;GEN.rwrite=gRWrite;GEN.rword=gRWord;GEN.rpic=gRPic;GEN.rsent=gRSent;GEN.rspic=gRSPic;GEN.rsyl=gRSyl;GEN.rfirst=gRFirst;GEN.rrhyme=gRRhyme;
 
 /* ---------- parent settings ---------- */
 var LIM={max:[3,1000],perWorld:[5,50],qStart:[3,20],qEnd:[3,20],heartsStart:[1,6],heartsEnd:[1,6]};
-var TYPEDESC={count:['ספירה','כמה עצמים יש בתמונה'],vcompare:['השוואת כמויות','איפה יש יותר או פחות (4 קבוצות)'],ncompare:['גדול וקטן','איזה מספר הכי גדול או הכי קטן'],sign:['גדול, קטן או שווה','בחירת הסימן המתאים'],order:['סדר המספרים','אחרי, לפני, מה חסר, ספירה בקפיצות'],tens:['עשרות ויחידות','פועל כשהטווח מ-20 ומעלה'],add:['חיבור',''],sub:['חיסור',''],missing:['מספר חסר','למשל 3 + ? = 7'],mul:['כפל','לא מומלץ לגיל 5'],div:['חילוק','לא מומלץ לגיל 5'],shape:['צורות','זיהוי צורות גיאומטריות']};
+var TYPEDESC={count:['ספירה','כמה עצמים יש בתמונה'],vcompare:['השוואת כמויות','איפה יש יותר או פחות (4 קבוצות)'],ncompare:['גדול וקטן','איזה מספר הכי גדול או הכי קטן'],sign:['גדול, קטן או שווה','בחירת הסימן המתאים'],order:['סדר המספרים','אחרי, לפני, מה חסר, ספירה בקפיצות'],tens:['עשרות ויחידות','פועל כשהטווח מ-20 ומעלה'],add:['חיבור',''],sub:['חיסור',''],missing:['מספר חסר','למשל 3 + ? = 7'],mul:['כפל','לא מומלץ לגיל 5'],div:['חילוק','לא מומלץ לגיל 5'],shape:['צורות','זיהוי צורות גיאומטריות'],write:['כתיבת מספרים','עוקבים באצבע על מספר מקווקו']};
 var SKILL_TXT={good:'שולט/ת',mid:'בתרגול',weak:'צריך חיזוק',new:'עוד אין מספיק נתונים'};
 var SKILL_COL={good:'#4CBF5F',mid:'#FFC940',weak:'#EC5B78',new:'#AFC6E2'};
 function DESC(k){return TYPEDESC[k]||RTYPEDESC[k]}
@@ -2107,8 +2213,8 @@ function raceStat(){$('#mini-stat').textContent='מקום '+racePlace()+' · '+M
 function raceNext(){
   if(!M||M.over)return;
   var p=levelParams(S.done),q=null;
-  for(var k=0;k<12;k++){q=makeQuestion(p,M.seen,M.last);if(!q.seq)break} // build-a-word needs the level screen
-  if(q.seq){q=GEN[S.track==='read'?'rpic':'add'](p);q.title=NAMES[q.type]}
+  for(var k=0;k<12;k++){q=makeQuestion(p,M.seen,M.last);if(!q.seq&&!q.trace)break} // build-a-word needs the level screen
+  if(q.seq||q.trace){q=GEN[S.track==='read'?'rpic':'add'](p);q.title=NAMES[q.type]}
   M.q=q;M.seen[q.key]=1;M.last=q.type;M.missed=false;M.lock=false;M.qT=Date.now();
   RECENT.push(q.key);if(RECENT.length>80)RECENT.shift();
   $('#rq-prompt').textContent=q.prompt;$('#rq-vis').innerHTML=q.visual||'';
@@ -2244,6 +2350,7 @@ var ACT={
   mem:function(t){memTap(+t.getAttribute('data-i'))},
   bal:function(t){balTap(t)},
   sim:function(t){simTap(+t.getAttribute('data-k'))},
+  'trace-clear':function(){if(TR&&!TR.done){TR.strokes=[];TR.cur=null;TR.hit={};TR.ink=0;Snd.tap();traceDraw()}},
   'race-ans':function(t){raceAnswer(+t.getAttribute('data-i'))},
   'mini-quit':function(){if(M&&!M.over)confirmBox('לצאת מהמשחקון?','הכרטיס לא יוחזר.','כן, לצאת',function(){clearTimers();stopMini();show('games')});else{clearTimers();stopMini();show('games')}},
   daily:function(){Snd.tap();openDaily()},
