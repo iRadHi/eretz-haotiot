@@ -1694,24 +1694,37 @@ function thin(m){ // Zhang-Suen thinning on the TG x TG grid
       del.forEach(function(i){m[i]=0});if(del.length)ch=true}}
   return m;
 }
+function skNb(m,x,y){var r=[];for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;var nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<TG&&ny<TG&&m[ny*TG+nx])r.push([nx,ny])}return r}
+function skWalk(m,x,y){ // from an end, follow the line until a junction or another end
+  var path=[[x,y]],seen={},cur=[x,y];seen[y*TG+x]=1;
+  while(true){var nb=skNb(m,cur[0],cur[1]).filter(function(q){return !seen[q[1]*TG+q[0]]});
+    if(nb.length!==1)return {path:path,junction:nb.length>1||skNb(m,cur[0],cur[1]).length>2};
+    cur=nb[0];seen[cur[1]*TG+cur[0]]=1;path.push(cur);if(path.length>300)return {path:path,junction:false}}
+}
+function prune(m){ // thinning leaves little spurs at corners; nobody traces those, so remove them
+  for(var pass=0;pass<3;pass++){var cut=false;
+    for(var y=0;y<TG;y++)for(var x=0;x<TG;x++){if(!m[y*TG+x]||skNb(m,x,y).length!==1)continue;
+      var w=skWalk(m,x,y);if(w.junction&&w.path.length<8){w.path.slice(0,-1).forEach(function(q){m[q[1]*TG+q[0]]=0});cut=true}}
+    if(!cut)break}
+}
 function traceGlyph(text){
   if(TRACE_CACHE[text])return TRACE_CACHE[text];
   var c=document.createElement('canvas');c.width=c.height=TG;var x=c.getContext('2d'),f=traceFit(x,text);
   x.fillStyle='#000';x.fillText(text,f.x,f.y);
   var d=x.getImageData(0,0,TG,TG).data,m=new Uint8Array(TG*TG);for(var i=0;i<TG*TG;i++)m[i]=d[i*4+3]>110?1:0;
-  thin(m);
+  thin(m);prune(m);
   var sk=[];for(var y=0;y<TG;y++)for(var xx=0;xx<TG;xx++)if(m[y*TG+xx])sk.push([xx,y]);
   var dots=[];sk.forEach(function(p){if(dots.every(function(q){return (q[0]-p[0])*(q[0]-p[0])+(q[1]-p[1])*(q[1]-p[1])>=9})) dots.push(p)}); // a dot every ~3 grid units
   // distance from the centerline, for judging whether the finger stayed on the letter
   var dist=new Float32Array(TG*TG).fill(99),qu=[];sk.forEach(function(p){dist[p[1]*TG+p[0]]=0;qu.push(p)});
   for(var h=0;h<qu.length;h++){var p=qu[h],dv=dist[p[1]*TG+p[0]];[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(o){var nx=p[0]+o[0],ny=p[1]+o[1];if(nx<0||ny<0||nx>=TG||ny>=TG)return;var ii=ny*TG+nx;if(dist[ii]>dv+1){dist[ii]=dv+1;qu.push([nx,ny])}})}
-  var ends=[];sk.forEach(function(p){var nb=0;for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;var nx=p[0]+dx,ny=p[1]+dy;if(nx>=0&&ny>=0&&nx<TG&&ny<TG&&m[ny*TG+nx])nb++}
-    if(nb===1){var bi=0,bd=1e9;dots.forEach(function(q,i){var dd=(q[0]-p[0])*(q[0]-p[0])+(q[1]-p[1])*(q[1]-p[1]);if(dd<bd){bd=dd;bi=i}});if(ends.indexOf(bi)<0)ends.push(bi)}});
+  var ends=[];sk.forEach(function(p){
+    if(skNb(m,p[0],p[1]).length===1&&skWalk(m,p[0],p[1]).path.length>=8){var bi=0,bd=1e9;dots.forEach(function(q,i){var dd=(q[0]-p[0])*(q[0]-p[0])+(q[1]-p[1])*(q[1]-p[1]);if(dd<bd){bd=dd;bi=i}});if(ends.indexOf(bi)<0)ends.push(bi)}});
   return TRACE_CACHE[text]={text:text,fit:f,dots:dots,dist:dist,ends:ends};
 }
 function initTrace(q){
   var host=$('#lv-visual'),cv=$('#tracecv');if(!cv)return;
-  var S2=Math.floor(Math.min(host.clientWidth-8,host.clientHeight-8,340)),dpr=window.devicePixelRatio||1;
+  var S2=Math.floor(Math.min(host.clientWidth-8,host.clientHeight-8,340));if(!(S2>=160))S2=Math.max(160,Math.min(window.innerWidth-60,300));var dpr=window.devicePixelRatio||1;
   cv.width=Math.round(S2*dpr);cv.height=Math.round(S2*dpr);cv.style.width=S2+'px';cv.style.height=S2+'px';
   var ctx=cv.getContext('2d');ctx.setTransform(dpr*S2/TG,0,0,dpr*S2/TG,0,0);
   TR={q:q,g:traceGlyph(q.trace),cv:cv,ctx:ctx,S:S2,strokes:[],cur:null,hit:{},ink:0,done:false};
@@ -1728,14 +1741,16 @@ function traceDraw(){
 }
 function tracePt(e){var r=TR.cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width*TG,(e.clientY-r.top)/r.height*TG]}
 function traceMark(p){ // dots near the finger turn green
-  TR.g.dots.forEach(function(d,i){if(!TR.hit[i]&&(d[0]-p[0])*(d[0]-p[0])+(d[1]-p[1])*(d[1]-p[1])<=4.6*4.6)TR.hit[i]=1});
+  TR.g.dots.forEach(function(d,i){if(!TR.hit[i]&&(d[0]-p[0])*(d[0]-p[0])+(d[1]-p[1])*(d[1]-p[1])<=5.2*5.2)TR.hit[i]=1});
 }
 function traceScore(){
   var g=TR.g,n=g.dots.length,hit=Object.keys(TR.hit).length,pts=0,ok=0;
   TR.strokes.forEach(function(s){s.forEach(function(p){var x=Math.round(p[0]),y=Math.round(p[1]);pts++;if(x>=0&&y>=0&&x<TG&&y<TG&&g.dist[y*TG+x]<=6)ok++})});
   return {cover:n?hit/n:0,acc:pts?ok/pts:0};
 }
-function traceGood(){var sc=traceScore();return sc.cover>=.88&&sc.acc>=.7&&TR.g.ends.every(function(i){return TR.hit[i]})}
+function traceGood(){var sc=traceScore();if(TR.fails)return sc.cover>=.72&&sc.acc>=.6; // after a miss, be lenient so the level never gets stuck
+  return sc.cover>=.82&&sc.acc>=.65&&TR.g.ends.every(function(i){return TR.hit[i]||traceNear(TR.g.dots[i],6.5)})}
+function traceNear(d,r){return TR.strokes.some(function(st){return st.some(function(p){return (p[0]-d[0])*(p[0]-d[0])+(p[1]-d[1])*(p[1]-d[1])<=r*r})})} // close enough to a stroke's end
 function traceCheck(){
   if(traceGood()){ // letters like מ need a second stroke: wait a moment in case another one starts
     var t=TR;clearTimeout(t.wait);
@@ -1743,8 +1758,8 @@ function traceCheck(){
     return;
   }
   // a lot of scribbling that doesn't follow the letter counts as a try
-  if(TR.ink>Math.max(60,TR.g.dots.length*3*3.2)){
-    answer(1);var t=TR;later(600,function(){if(TR===t){t.strokes=[];t.hit={};t.ink=0;traceDraw()}});
+  if(TR.ink>Math.max(50,TR.g.dots.length*3*2.4)){
+    TR.fails=(TR.fails||0)+1;answer(1);var t=TR;later(600,function(){if(TR===t){t.strokes=[];t.hit={};t.ink=0;traceDraw()}});
   }
 }
 document.addEventListener('pointerdown',function(e){
