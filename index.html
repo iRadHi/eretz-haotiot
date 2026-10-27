@@ -659,7 +659,7 @@ var DEF={max:10,ramp:'normal',perWorld:15,qStart:5,qEnd:10,heartsStart:4,heartsE
   types:{count:1,vcompare:1,ncompare:1,sign:1,order:1,tens:1,add:1,sub:1,missing:0,mul:0,div:0,shape:1,write:1},
   dots:1,sound:1,speak:1,gate:1,adapt:1,memPairs:0,
   read:1,rtypes:{rword:1,rpic:1,rsent:1,rspic:1,rsyl:1,rfirst:1,rrhyme:1,rwrite:1},
-  nikud:{a:1,e:0,i:0,oh:0,om:0,u1:0,u2:0,shva:0,hataf:0},finals:1};
+  writeFinals:0,nikud:{a:1,e:0,i:0,oh:0,om:0,u1:0,u2:0,shva:0,hataf:0},finals:1};
 function fresh(){return {v:1,name:'',avatar:null,coins:0,done:0,stars:{},owned:{acc:[],bg:['grass']},equip:{head:null,face:null,neck:null,bg:'grass'},growth:0,stats:{},track:'math',prog:{},mood:{},pet:null,sayNext:null,
   stickers:{},friends:[],growthBy:{},hunger:0,tickets:1,daily:{},streak:{n:0,last:'',best:0},ach:{},surp:{},
   cnt:{correct:0,bestRun:0,perfect:0,boss:0,daily:0,mini:0,surp:0},
@@ -1523,7 +1523,9 @@ function traceGlyph(text){
   // distance from the centerline, for judging whether the finger stayed on the letter
   var dist=new Float32Array(TG*TG).fill(99),qu=[];sk.forEach(function(p){dist[p[1]*TG+p[0]]=0;qu.push(p)});
   for(var h=0;h<qu.length;h++){var p=qu[h],dv=dist[p[1]*TG+p[0]];[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(o){var nx=p[0]+o[0],ny=p[1]+o[1];if(nx<0||ny<0||nx>=TG||ny>=TG)return;var ii=ny*TG+nx;if(dist[ii]>dv+1){dist[ii]=dv+1;qu.push([nx,ny])}})}
-  return TRACE_CACHE[text]={text:text,fit:f,dots:dots,dist:dist};
+  var ends=[];sk.forEach(function(p){var nb=0;for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;var nx=p[0]+dx,ny=p[1]+dy;if(nx>=0&&ny>=0&&nx<TG&&ny<TG&&m[ny*TG+nx])nb++}
+    if(nb===1){var bi=0,bd=1e9;dots.forEach(function(q,i){var dd=(q[0]-p[0])*(q[0]-p[0])+(q[1]-p[1])*(q[1]-p[1]);if(dd<bd){bd=dd;bi=i}});if(ends.indexOf(bi)<0)ends.push(bi)}});
+  return TRACE_CACHE[text]={text:text,fit:f,dots:dots,dist:dist,ends:ends};
 }
 function initTrace(q){
   var host=$('#lv-visual'),cv=$('#tracecv');if(!cv)return;
@@ -1551,16 +1553,20 @@ function traceScore(){
   TR.strokes.forEach(function(s){s.forEach(function(p){var x=Math.round(p[0]),y=Math.round(p[1]);pts++;if(x>=0&&y>=0&&x<TG&&y<TG&&g.dist[y*TG+x]<=6)ok++})});
   return {cover:n?hit/n:0,acc:pts?ok/pts:0};
 }
+function traceGood(){var sc=traceScore();return sc.cover>=.88&&sc.acc>=.7&&TR.g.ends.every(function(i){return TR.hit[i]})}
 function traceCheck(){
-  var sc=traceScore();
-  if(sc.cover>=.85&&sc.acc>=.7){TR.done=true;traceDraw();Snd.star(2);later(350,function(){answer(0)});return}
+  if(traceGood()){ // letters like מ need a second stroke: wait a moment in case another one starts
+    var t=TR;clearTimeout(t.wait);
+    t.wait=setTimeout(function(){if(TR!==t||t.cur||t.done||!L||L.locked||!traceGood())return;t.done=true;traceDraw();Snd.star(2);later(350,function(){answer(0)})},1000);
+    return;
+  }
   // a lot of scribbling that doesn't follow the letter counts as a try
   if(TR.ink>Math.max(60,TR.g.dots.length*3*3.2)){
     answer(1);var t=TR;later(600,function(){if(TR===t){t.strokes=[];t.hit={};t.ink=0;traceDraw()}});
   }
 }
 document.addEventListener('pointerdown',function(e){
-  if(!TR||TR.done||e.target!==TR.cv||!L||L.locked)return;e.preventDefault();
+  if(!TR||TR.done||e.target!==TR.cv||!L||L.locked)return;e.preventDefault();clearTimeout(TR.wait);
   var p=tracePt(e);TR.cur=[p];TR.pid=e.pointerId;traceMark(p);traceDraw();
 });
 document.addEventListener('pointermove',function(e){
@@ -1577,7 +1583,7 @@ function gWrite(p){ // numbers: single digits first, then up to 20
     visual:'<canvas class="tracecv" id="tracecv" aria-label="מספר לעקוב עליו"></canvas>',options:[{value:'ok',html:''},{value:'bad',html:''}],answer:'ok',key:'w'+s};
 }
 function gRWrite(p){
-  var pool=ALEF.split('').concat(S.set.finals?FINALS.split(''):[]),ch=pick(pool),nm=LETTER_NAMES[ch]||ch;
+  var pool=ALEF.split('').concat(S.set.writeFinals?FINALS.split(''):[]),ch=pick(pool),nm=LETTER_NAMES[ch]||ch;
   return {type:'rwrite',trace:ch,prompt:'עקבו באצבע על האות '+ch,say:'עקבו באצבע על האות '+nm,text:'כתיבה: '+ch,
     visual:'<canvas class="tracecv" id="tracecv" aria-label="אות לעקוב עליה"></canvas>',options:[{value:'ok',html:''},{value:'bad',html:''}],answer:'ok',key:'rw_'+ch};
 }
@@ -2011,7 +2017,8 @@ function readingCard(){
   if(c.read){
     var P=rPools();
     h+='<p class="hint"><b>סוגי תרגילים</b></p><div class="chkgrid">'+Object.keys(RTYPEDESC).map(function(k){return chk('data-rtype="'+k+'"','f-r-'+k,RTYPEDESC[k][0],RTYPEDESC[k][1],c.rtypes[k])}).join('')+'</div>';
-    h+='<p class="hint"><b>ניקוד בתרגילים</b> · יופיעו רק מילים שכל הניקוד שלהן מסומן כאן.</p><div class="chkgrid">'+NIK.map(function(n){return chk('data-nik="'+n[0]+'"','f-n-'+n[0],'<span class="hw">'+n[1]+'</span>',null,c.nikud[n[0]])}).join('')+chk('data-flag="finals"','f-finals','אותיות סופיות','ך ם ן ף ץ',c.finals)+'</div>';
+    h+=chk('data-flag="writeFinals"','f-wfin','אותיות סופיות בכתיבה','ך ם ן ף ץ בתרגיל כתיבת אותיות',c.writeFinals);
+    h+='<p class="hint"><b>ניקוד בתרגילים</b> · יופיעו רק מילים שכל הניקוד שלהן מסומן כאן.</p><div class="chkgrid">'+NIK.map(function(n){return chk('data-nik="'+n[0]+'"','f-n-'+n[0],'<span class="hw">'+n[1]+'</span>',null,c.nikud[n[0]])}).join('')+chk('data-flag="finals"','f-finals','מילים עם אותיות סופיות','ך ם ן ף ץ בתוך מילים ומשפטים',c.finals)+'</div>';
     h+='<p class="hint">מתאימים להגדרות כרגע: '+P.words.length+' מילים ('+P.pics.length+' עם תמונה), '+P.sents.length+' משפטים להשלמה ו-'+P.spics.length+' משפטים עם תמונה.</p>';
     if(P.words.length<8)h+='<div class="nostore">יש מעט מדי מילים בהגדרות האלה. כדאי לסמן עוד ניקוד.</div>';
     if(!hasHeVoice())h+='<div class="nostore">לא נמצא קול עברי במכשיר, ולכן התרגיל "סמנו את המילה" לא יופיע. באנדרואיד: הגדרות ← מערכת ← שפות וקלט ← פלט של המרת טקסט לדיבור ← מנוע Google ← התקנת נתונים קוליים ← עברית.</div>';
@@ -2350,7 +2357,7 @@ var ACT={
   mem:function(t){memTap(+t.getAttribute('data-i'))},
   bal:function(t){balTap(t)},
   sim:function(t){simTap(+t.getAttribute('data-k'))},
-  'trace-clear':function(){if(TR&&!TR.done){TR.strokes=[];TR.cur=null;TR.hit={};TR.ink=0;Snd.tap();traceDraw()}},
+  'trace-clear':function(){if(TR&&!TR.done){clearTimeout(TR.wait);TR.strokes=[];TR.cur=null;TR.hit={};TR.ink=0;Snd.tap();traceDraw()}},
   'race-ans':function(t){raceAnswer(+t.getAttribute('data-i'))},
   'mini-quit':function(){if(M&&!M.over)confirmBox('לצאת מהמשחקון?','הכרטיס לא יוחזר.','כן, לצאת',function(){clearTimers();stopMini();show('games')});else{clearTimers();stopMini();show('games')}},
   daily:function(){Snd.tap();openDaily()},
