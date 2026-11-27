@@ -2097,7 +2097,7 @@ var AR_PW={double:{e:'⚡',n:'יריות כפולות',t:12,col:'#2FA0EA'},shiel
 function arGain(t){var a=AR,pw=AR_PW[t],n=a.bag[t]||0; // a solved power orb goes into the bag until the child uses it
   if(n>=3){arBanner('🎒 כבר יש 3 '+pw.e,1.3);Snd.tap();return}
   a.bag[t]=n+1;save();a.ringT=3;arBanner(pw.e+' '+pw.n+' נשמר בכלים!',1.5);arFx(a.px,a.py,pw.col,14);Snd.sparkle(0,6,.3);
-  if(!S.arSeen.bag){S.arSeen.bag=1;save();speakText('הכלי נשמר! נוגעים בג׳ויסטיק ובוחרים מתי להשתמש בו')}}
+  if(!S.arSeen.bag){S.arSeen.bag=1;save();speakText('הכלי נשמר! נוגעים במסך ובוחרים מתי להשתמש בו')}}
 function arUse(k){var a=AR;if(!a||a.paused||a.won||a.lost)return;a.ringT=Math.max(a.ringT||0,1.5);
   if(k==='super'){if(a.charge<a.CH){Snd.tap();toast('⚡ מנצחים עוד מפלצות כדי למלא את הברק');return}a.joy=null;a.ringT=0;arAsk('super');return}
   if(!(a.bag[k]>0))return;a.bag[k]--;save();arPowerUp(k)}
@@ -2135,7 +2135,7 @@ function startArena(g){
   $('#ar-title').textContent='⚔️ זירה · שלב '+(g%N+1);
   $('#ar-board').style.backgroundImage='url('+A[worldTheme(w).tile]+')';
   $('#ar-wave').textContent='⚔️';$('#ar-hearts').innerHTML='';
-  var help='מזיזים את הג׳ויסטיק למטה כדי ללכת, והחבר יורה לבד! עוברים מחדר לחדר: מביסים את המפלצות כדי לפתוח את השערים, ובסוף מביסים את הבוס ועומדים על שער היציאה. כדורי כוח בדרך נותנים כלים למי שפותר תרגיל, והם נשמרים עד שמשתמשים בהם! נוגעים בג׳ויסטיק כדי לפתוח את הכלים ואת מכת־העל.';
+  var help='נוגעים בכל מקום במסך וגוררים כדי ללכת, והחבר יורה לבד! עוברים מחדר לחדר: מביסים את המפלצות כדי לפתוח את השערים, ובסוף מביסים את הבוס ועומדים על שער היציאה. כדורי כוח בדרך נותנים כלים למי שפותר תרגיל, והם נשמרים עד שמשתמשים בהם! כשנוגעים במסך נפתחים גם הכלים ומכת־העל.';
   var nf=Object.keys(AR_FEAT).filter(function(f){return AR_FEAT[f].k===AR.k});if(nf.length)help+=' ✨ חדש בזירה הזאת: '+nf.map(function(f){return AR_FEAT[f].e+' '+AR_FEAT[f].n}).join(' ו')+'!';
   if(S.set.arTime)help+=' ⏱️ יש '+(S.set.arTime===1?'דקה אחת':S.set.arTime+' דקות')+' להגיע לשער!';
   arOver('<div class="ar-card"><h3>מי יוצא לקרב?</h3><div class="ar-pick">'+AR.fighters.map(function(f,i){return '<button class="ar-fi" data-act="arena-pick" data-i="'+i+'"><img src="'+f.src+'" alt="">'+esc(f.name)+'<small>'+(f.mine?'החבר שלי':'מפלצת '+RNAME[f.r])+'</small>'+(f.lv>1?'<small class="ar-lv">רמה '+f.lv+'</small>':'')+'</button>'}).join('')+'</div><p class="ar-help">'+help+'</p>'+
@@ -2153,14 +2153,14 @@ function arBegin(i){
   a.enImg=arMonImg(a.boss);a.imgs={boss:a.enImg,blob:a.enImg,run:arMonImg(AR_EN.run),tank:arMonImg(AR_EN.tank),spit:arMonImg(AR_EN.spit)};
   a.shake=0;a.flash=0;a.combo=0;a.lastKill=-9;a.dust=0;a.buff={};
   a.tx=null;a.ty=null;a.sx=null;a.down=false;a.hearts=5;a.inv=0;a.cd=.6;a.bul=[];a.eb=[];a.en=[];a.fx=[];
-  a.bag=S.arBag;a.joy=null;a.jx=0;a.jy=0;a.jm=0;a.ringT=0;a.J={x:W/2,y:H-80*a.s,r:54*a.s};a.charge=0;a.CH=5;a.kills=0;a.revives=0;a.t=0;a.last=0;a.paused=false;a.T0=(S.set.arTime||0)*60;a.time=a.T0;a.lost=false;
+  a.bag=S.arBag;a.joy=null;a.jx=0;a.jy=0;a.jm=0;a.ringT=0;a.jT=0;a.J={x:W/2,y:H-80*a.s,r:54*a.s};a.charge=0;a.CH=5;a.kills=0;a.revives=0;a.t=0;a.last=0;a.paused=false;a.T0=(S.set.arTime||0)*60;a.time=a.T0;a.lost=false;
   arBuild();
   cv.addEventListener('pointerdown',function(e){e.preventDefault();var a=AR;if(!a||a.paused)return;var r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
     var it=arRingHit(x,y);if(it){arUse(it);return} // a tool from the ring around the joystick
-    if(a.joy==null&&Math.hypot(x-a.J.x,y-a.J.y)<a.J.r*1.7){try{cv.setPointerCapture(e.pointerId)}catch(_){}a.joy=e.pointerId;a.down=false;arJoy(x,y);return}
-    if(a.joy!=null)return;try{cv.setPointerCapture(e.pointerId)}catch(_){}a.down=true;arAim(e)}); // tapping the field still walks there
-  cv.addEventListener('pointermove',function(e){var a=AR;if(!a||a.paused)return;if(e.pointerId===a.joy){var r=cv.getBoundingClientRect();arJoy(e.clientX-r.left,e.clientY-r.top)}else if(a.down)arAim(e)});
-  var up=function(e){var a=AR;if(!a)return;if(e.pointerId===a.joy){a.joy=null;a.jm=0;a.tx=null;a.ringT=2.5}else a.down=false};
+    if(a.joy!=null)return;try{cv.setPointerCapture(e.pointerId)}catch(_){} // the joystick appears wherever the finger lands
+    a.J.x=clamp(x,a.J.r,a.W-a.J.r);a.J.y=clamp(y,a.J.r,a.H-a.J.r);a.joy=e.pointerId;a.jT=0;arJoy(x,y)});
+  cv.addEventListener('pointermove',function(e){var a=AR;if(!a||a.paused)return;if(e.pointerId===a.joy){var r=cv.getBoundingClientRect();arJoy(e.clientX-r.left,e.clientY-r.top)}});
+  var up=function(e){var a=AR;if(!a)return;if(e.pointerId===a.joy){a.joy=null;a.jm=0;a.tx=null;a.ringT=1.5;a.jT=1.5}}; // it fades away 1.5s after the finger lifts
   cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);cv.addEventListener('lostpointercapture',up);
   arHud();arBanner('🚩 יוצאים לדרך!',1.4);arMusic();Snd.tone(523.25,0,.15,'triangle',.2);Snd.tone(783.99,.15,.25,'triangle',.2);
   a.raf=requestAnimationFrame(arLoop);
@@ -2244,9 +2244,9 @@ function arBuild(){ // a tall world of rooms from the bottom up to the exit; wal
 function arJoy(x,y){var a=AR,dx=x-a.J.x,dy=y-a.J.y,d=Math.hypot(dx,dy)||1; // pull further from the middle = walk faster
   a.jx=dx/d;a.jy=dy/d;a.jm=Math.min(1,d/a.J.r);if(a.jm<.15)a.jm=0}
 function arRing(){var a=AR,L2=['super'].concat(Object.keys(AR_PW).filter(function(k){return a.bag[k]>0})),n=L2.length,R=104*a.s; // tools in an arc above the joystick
-  return L2.map(function(k,i){var an=-Math.PI/2+(i-(n-1)/2)*.62;return {k:k,x:a.J.x+Math.cos(an)*R,y:a.J.y+Math.sin(an)*R}})}
+  var up=a.J.y>R+40*a.s?-1:1,m=32*a.s;
+  return L2.map(function(k,i){var an=up*Math.PI/2+(i-(n-1)/2)*.62;return {k:k,x:clamp(a.J.x+Math.cos(an)*R,m,a.W-m),y:clamp(a.J.y+Math.sin(an)*R,m,a.H-m)}})}
 function arRingHit(x,y){var a=AR;if(a.joy==null&&!(a.ringT>0))return null;var g=arRing();for(var i=0;i<g.length;i++)if(Math.hypot(x-g[i].x,y-g[i].y)<32*a.s)return g[i].k;return null}
-function arAim(e){var a=AR,r=a.cv.getBoundingClientRect();a.sx=e.clientX-r.left;a.sy=e.clientY-r.top;a.tx=a.sx;a.ty=a.sy+a.cy}
 function arHud(){var a=AR,h='';for(var i=0;i<5;i++)h+=heartSVG(i<a.hearts);$('#ar-hearts').innerHTML=h;
   var R=a.rooms.length,ri=a.ri||0;
   $('#ar-wave').textContent=a.goal.open?'🏁 לשער!':ri>=R-1?'👹 בוס!':'🚪 חדר '+(ri+1)+' מתוך '+(R-1)}
@@ -2300,8 +2300,7 @@ function arStep(dt){
     if(t0>30&&a.time<=30){arBanner('⏱️ עוד 30 שניות!',1.4);speakText('עוד שלושים שניות!');Snd.tone(660,0,.15,'square',.08);Snd.tone(660,.2,.15,'square',.08)}
     if(a.time<=10&&Math.ceil(a.time)<Math.ceil(t0))Snd.tone(a.time<=3?1046.5:880,0,.08,'square',.07);
     if(a.time<=0){arTimeUp();return}}
-  if(a.ringT>0&&a.joy==null)a.ringT-=dt;
-  if(a.down&&a.sx!=null){a.tx=a.sx;a.ty=a.sy+a.cy} // holding the finger still keeps walking that way
+  if(a.joy==null){if(a.ringT>0)a.ringT-=dt;if(a.jT>0)a.jT-=dt}
   var st=230*s*(a.buff.speed?1.5:1)*dt;
   if(a.joy!=null){if(a.jm>0){a.tx=a.px+a.jx*400*s;a.ty=a.py+a.jy*400*s;st*=.3+.7*a.jm}else a.tx=null}
   if(a.tx!=null){var dx=a.tx-a.px,dy=a.ty-a.py,d=Math.hypot(dx,dy);
@@ -2411,14 +2410,16 @@ function arDrawJoy(c,s){var a=AR,J=a.J,ready=a.charge>=a.CH,bagN=0;for(var k in 
       c.font=Math.round(24*s)+'px sans-serif';c.fillStyle='#000';c.fillText(sup?'⚡':pw.e,it.x,it.y+1*s);
       if(!sup){var bx=it.x+R*.75,by=it.y-R*.75;c.fillStyle='#EC5B78';c.beginPath();c.arc(bx,by,10*s,0,7);c.fill();c.fillStyle='#fff';c.font='800 '+Math.round(13*s)+'px Rubik,sans-serif';c.fillText(a.bag[it.k],bx,by+1*s)}});
     c.globalAlpha=1}
+  if(a.joy==null&&!(a.jT>0)){if(ready||bagN){var hx=a.W/2,hy=a.H-30*s,pr2=ready?1+Math.abs(Math.sin(a.t*5))*.1:1; // nothing touched: a small reminder of what is waiting
+      c.fillStyle='rgba(255,255,255,.85)';c.strokeStyle=ready?'#FFC940':'#1F2B47';c.lineWidth=3*s;c.beginPath();c.arc(hx,hy,22*s*pr2,0,7);c.fill();c.stroke();
+      c.font=Math.round(15*s)+'px sans-serif';c.fillStyle='#000';c.fillText((ready?'⚡':'')+(bagN?'🎒':''),hx,hy+1*s)}return}
   // the joystick: base + knob
-  c.globalAlpha=a.joy!=null?.95:.7;
+  c.globalAlpha=a.joy!=null?.95:.7*Math.min(1,a.jT/.4);
   c.fillStyle='rgba(31,43,71,.28)';c.beginPath();c.arc(J.x,J.y,J.r,0,7);c.fill();
   c.lineWidth=4*s;c.strokeStyle=ready&&!open?'rgba(255,201,64,'+(.6+Math.sin(a.t*6)*.4).toFixed(2)+')':'rgba(255,255,255,.85)';c.beginPath();c.arc(J.x,J.y,J.r,0,7);c.stroke();
   var kx=J.x+a.jx*a.jm*J.r*.75,ky=J.y+a.jy*a.jm*J.r*.75;if(a.joy==null){kx=J.x;ky=J.y}
   c.fillStyle='#fff';c.strokeStyle='#1F2B47';c.lineWidth=3*s;c.beginPath();c.arc(kx,ky,24*s,0,7);c.fill();c.stroke();
   c.globalAlpha=1;
-  if(!open&&(ready||bagN)){c.font=Math.round(16*s)+'px sans-serif';c.fillStyle='#000';var hint=(ready?'⚡':'')+(bagN?'🎒':'');c.fillText(hint,kx,ky+1*s)}
 }
 function arSuper(){
   var a=AR;a.charge=0;
@@ -2577,7 +2578,6 @@ function arDraw(){
   c.restore();c.textAlign='center';c.textBaseline='middle';
   if(a.flash>0){c.fillStyle='rgba(236,91,120,'+(a.flash*.9).toFixed(2)+')';c.fillRect(0,0,W,H)}
   if(a.hearts===1&&!a.paused){var vg=c.createRadialGradient(W/2,H/2,Math.min(W,H)*.35,W/2,H/2,Math.max(W,H)*.75);vg.addColorStop(0,'rgba(236,91,120,0)');vg.addColorStop(1,'rgba(236,91,120,'+(.35+Math.sin(a.t*6)*.15).toFixed(2)+')');c.fillStyle=vg;c.fillRect(0,0,W,H)}
-  if(a.tx!=null&&a.down){c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=3;c.beginPath();c.arc(a.tx,a.ty-cy,12*s,0,7);c.stroke()}
   // active powers (top right) with a shrinking timer
   var bi=0;for(var bk in a.buff){var pw=AR_PW[bk],bx2=W-46*s,by2=14*s+bi*46*s;
     c.fillStyle='rgba(255,255,255,.9)';c.strokeStyle=pw.col;c.lineWidth=3*s;c.beginPath();c.arc(bx2+18*s,by2+18*s,18*s,0,7);c.fill();c.stroke();
