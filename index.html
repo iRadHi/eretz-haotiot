@@ -2268,6 +2268,9 @@ function arBox(x,y,r,b){ // push a circle out of a box
 function arSolid(o,r,water){var a=AR,nw=a.walls.length; // walls (and water, for the friend) and shut doors push o out
   for(var i=0;i<nw+a.doors.length;i++){var b=i<nw?a.walls[i]:a.doors[i-nw];
     if(b.open||(b.water&&!water)||b.y>o.y+r||b.y+b.h<o.y-r)continue;var q=arBox(o.x,o.y,r,b);if(q){o.x=q[0];o.y=q[1]}}}
+function arWallAt(x,y){var a=AR,L2=a.walls.concat(a.doors);for(var i=0;i<L2.length;i++){var b=L2[i]; // shots stop at walls and shut doors (they fly over water)
+    if(!b.open&&!b.water&&x>b.x&&x<b.x+b.w&&y>b.y&&y<b.y+b.h)return true}return false}
+function arSees(x1,y1,x2,y2){var n=Math.ceil(Math.hypot(x2-x1,y2-y1)/10);for(var i=1;i<n;i++)if(arWallAt(x1+(x2-x1)*i/n,y1+(y2-y1)*i/n))return false;return true}
 function arRoomAt(y){var R=AR.rooms;for(var i=0;i<R.length;i++)if(y>=R[i].y0)return i;return R.length-1}
 function arHurt(){var a=AR;if(a.inv>0||a.buff.shield)return false;
   a.hearts--;a.inv=1.4;a.shake=10;a.flash=.3;Snd.wrong();arFx(a.px,a.py,'#EC5B78',8);arHud();
@@ -2351,19 +2354,19 @@ function arStep(dt){
   a.cd-=dt;
   if(a.cd<=0){ // shoot at the nearest awake monster on screen
     var tg=null,best=Math.pow(H*.6,2);
-    a.en.forEach(function(e){if(!(e.crate||R[e.camp].on)||e.x<0||e.x>W||e.y<a.cy||e.y>a.cy+H)return;var d=(e.x-a.px)*(e.x-a.px)+(e.y-a.py)*(e.y-a.py);if(d<best){best=d;tg=e}});
+    a.en.forEach(function(e){if(!(e.crate||R[e.camp].on)||e.x<0||e.x>W||e.y<a.cy||e.y>a.cy+H)return;var d=(e.x-a.px)*(e.x-a.px)+(e.y-a.py)*(e.y-a.py);if(d<best&&arSees(a.px,a.py,e.x,e.y)){best=d;tg=e}});
     if(tg){var ang=Math.atan2(tg.y-a.py,tg.x-a.px),n=a.pow.shots*(a.buff.double?2:1);
       for(var k=0;k<n;k++){var an=ang+(k-(n-1)/2)*.2;a.bul.push({x:a.px,y:a.py,vx:Math.cos(an)*460*s,vy:Math.sin(an)*460*s,life:1.2})}
       a.cd=a.pow.rate*(a.buff.rapid?.45:1);Snd.tone(880,0,.06,'square',.03,520)}
   }
   a.bul=a.bul.filter(function(b){
-    b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0)return false;
+    b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0)return false;if(arWallAt(b.x,b.y)){arFx(b.x,b.y,'#fff',3);return false}
     for(var j=0;j<a.en.length;j++){var e=a.en[j];if(e.hp>0&&Math.hypot(e.x-b.x,e.y-b.y)<e.r+6*s){arDamage(e,a.pow.dmg,b.vx*.15,b.vy*.15);return false}}
     return true});
   a.en=a.en.filter(function(e){return e.hp>0});
   R.forEach(function(rm,i){var d=rm.door;if(!d||d.open||d.kind!=='gate'||!rm.on||a.en.some(function(e){return e.camp===i}))return;arOpen(d,'🚧 השער נפתח!')});
   if(!a.goal.open&&R[last].on&&!a.en.some(function(e){return e.camp===last})){a.goal.open=true;a.shake=12;arFx(a.goal.x,a.goal.y,'#FFC940',24);arFx(a.goal.x,a.goal.y,'#EC5B78',16);arHud();arBanner('🏁 לשער היציאה!',1.8);Snd.sparkle(0,10,.5);speakText('כל הכבוד! עכשיו הולכים לשער היציאה')}
-  for(var q=0;q<a.eb.length;q++){var o=a.eb[q];o.x+=o.vx*dt;o.y+=o.vy*dt;o.life-=dt;
+  for(var q=0;q<a.eb.length;q++){var o=a.eb[q];o.x+=o.vx*dt;o.y+=o.vy*dt;o.life-=dt;if(arWallAt(o.x,o.y)){o.life=0;arFx(o.x,o.y,o.c||'#fff',4);continue}
     if(a.buff.shield&&Math.hypot(o.x-a.px,o.y-a.py)<pr+9*s){o.life=0;arFx(o.x,o.y,AR_PW.shield.col,6);continue}
     if(a.inv<=0&&Math.hypot(o.x-a.px,o.y-a.py)<pr*.7+9*s){o.life=0;if(arHurt())return}}
   a.eb=a.eb.filter(function(o){return o.life>0&&o.x>-20&&o.x<W+20&&o.y>a.cy-20&&o.y<a.cy+H+20});
