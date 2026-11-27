@@ -604,11 +604,6 @@ select{width:auto;min-width:130px;text-align:right}
 .ar-visual{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
 .ar-opts{display:grid;gap:10px;grid-template-columns:1fr 1fr;width:100%}
 .ar-opts.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
-.ar-bot{display:flex;justify-content:center;padding-top:12px;padding-bottom:max(14px, env(safe-area-inset-bottom, 0px))}
-.ar-super{position:relative;overflow:hidden;min-width:230px;background:#C9D4E3;box-shadow:0 6px 0 #9AA8BC;color:#fff}
-.ar-super i{position:absolute;top:0;bottom:0;right:0;width:0;background:var(--sun);opacity:.85;transition:width .25s}
-.ar-super span{position:relative}
-.ar-super.ready{background:var(--sun);box-shadow:0 6px 0 var(--sun-d);color:var(--ink);animation:pulse2 .9s ease-in-out infinite}
 .node .ar-ic{position:absolute;left:50%;top:-20px;transform:translateX(-50%);font-size:24px;filter:drop-shadow(0 2px 0 rgba(0,0,0,.25));pointer-events:none}
 .nostore{background:#FFF4D6;border-radius:12px;padding:8px 12px;font:500 14px var(--font-body);color:#6B4E00}
 @media (max-height:700px){
@@ -781,7 +776,6 @@ select{width:auto;min-width:130px;text-align:right}
       <span class="pill" id="ar-wave"></span>
     </div>
     <div class="ar-board" id="ar-board"><div class="ar-over" id="ar-over" hidden></div></div>
-    <div class="ar-bot pad"><button class="btn ar-super" id="ar-super" data-act="arena-super"><i id="ar-fill"></i><span>⚡ מכת־על</span></button></div>
   </section>
 
   <div class="ov" id="ov-daily" hidden><div class="dlg" id="daily-dlg"></div></div>
@@ -827,7 +821,7 @@ var DEF={max:10,ramp:'normal',perWorld:15,qStart:5,qEnd:10,heartsStart:4,heartsE
   dots:1,sound:1,speak:1,gate:1,adapt:1,memPairs:0,
   read:1,rtypes:{rword:1,rpic:1,rsent:1,rspic:1,rsyl:1,rfirst:1,rrhyme:1,rwrite:1,rmiss:1,ropp:1,rplur:1,rorder:1,rodd:1,rstory:1},
   writeFinals:0,nikud:{a:1,e:0,i:0,oh:0,om:0,u1:0,u2:0,shva:0,hataf:0},finals:1};
-function fresh(){return {v:1,name:'',avatar:null,coins:0,done:0,stars:{},owned:{acc:[],bg:['grass']},equip:{head:null,face:null,neck:null,bg:'grass'},growth:0,stats:{},track:'math',prog:{},pantry:{},mstk:{},mlv:{},arSeen:{},troph:null,roadGot:0,mood:{},pet:null,sayNext:null,
+function fresh(){return {v:1,name:'',avatar:null,coins:0,done:0,stars:{},owned:{acc:[],bg:['grass']},equip:{head:null,face:null,neck:null,bg:'grass'},growth:0,stats:{},track:'math',prog:{},pantry:{},mstk:{},mlv:{},arSeen:{},arBag:{},troph:null,roadGot:0,mood:{},pet:null,sayNext:null,
   stickers:{},friends:[],growthBy:{},hunger:0,tickets:1,daily:{},streak:{n:0,last:'',best:0},ach:{},surp:{},
   cnt:{correct:0,bestRun:0,perfect:0,boss:0,daily:0,mini:0,surp:0},
   set:JSON.parse(JSON.stringify(DEF))}}
@@ -2100,6 +2094,13 @@ var AR_COL=['#FFC940','#2FA0EA','#B66BFF','#EC5B78'];
 var AR_POW=[{dmg:1,rate:.5,shots:1},{dmg:1,rate:.42,shots:1},{dmg:2,rate:.6,shots:1},{dmg:1,rate:.55,shots:3}]; // by monster rarity
 var AR_CAMPS=[{hp:3,sp:48,mix:['blob','blob','run','blob']},{hp:4,sp:54,mix:['blob','run','tank','run','blob','spit']},{hp:4,sp:60,mix:['run','tank','spit','blob','run','spit','tank']}]; // monster groups along the road, each guarding a gate
 var AR_PW={double:{e:'⚡',n:'יריות כפולות',t:12,col:'#2FA0EA'},shield:{e:'🛡️',n:'מגן',t:10,col:'#4CC38A'},rapid:{e:'🔥',n:'ירי מהיר',t:12,col:'#FF7A3D'},speed:{e:'👟',n:'ריצה מהירה',t:12,col:'#FFC940'}}; // power orbs: solve an exercise, get the power for a few seconds
+function arGain(t){var a=AR,pw=AR_PW[t],n=a.bag[t]||0; // a solved power orb goes into the bag until the child uses it
+  if(n>=3){arBanner('🎒 כבר יש 3 '+pw.e,1.3);Snd.tap();return}
+  a.bag[t]=n+1;save();a.ringT=3;arBanner(pw.e+' '+pw.n+' נשמר בכלים!',1.5);arFx(a.px,a.py,pw.col,14);Snd.sparkle(0,6,.3);
+  if(!S.arSeen.bag){S.arSeen.bag=1;save();speakText('הכלי נשמר! נוגעים בג׳ויסטיק ובוחרים מתי להשתמש בו')}}
+function arUse(k){var a=AR;if(!a||a.paused||a.won||a.lost)return;a.ringT=Math.max(a.ringT||0,1.5);
+  if(k==='super'){if(a.charge<a.CH){Snd.tap();toast('⚡ מנצחים עוד מפלצות כדי למלא את הברק');return}a.joy=null;a.ringT=0;arAsk('super');return}
+  if(!(a.bag[k]>0))return;a.bag[k]--;save();arPowerUp(k)}
 function arPowerUp(t){var a=AR,pw=AR_PW[t];a.buff[t]=pw.t;arBanner(pw.e+' '+pw.n+'!',1.3);arFx(a.px,a.py,pw.col,22);a.fx.push({ring:1,x:a.px,y:a.py,R:90*a.s,t:.5,T:.5,col:pw.col});
   Snd.sparkle(0,8,.4);Snd.tone(523.25,0,.12,'square',.07);Snd.tone(783.99,.1,.12,'square',.07);Snd.tone(1046.5,.2,.25,'square',.07)}
 var AR_EN={blob:{r:22,hp:1,sp:1},run:{c:'#FF8FB1',d:'#C24E77',r:16,hp:.5,sp:1.7},tank:{c:'#8C7AE6',d:'#4B3C9E',r:31,hp:2.5,sp:.6},spit:{c:'#FFD34D',d:'#C99A00',r:21,hp:1,sp:.9}}; // regular, fast, big and spitting monsters
@@ -2133,8 +2134,8 @@ function startArena(g){
   show('arena');
   $('#ar-title').textContent='⚔️ זירה · שלב '+(g%N+1);
   $('#ar-board').style.backgroundImage='url('+A[worldTheme(w).tile]+')';
-  $('#ar-wave').textContent='⚔️';$('#ar-hearts').innerHTML='';arSuperUI();
-  var help='גוררים את האצבע כדי ללכת, והחבר יורה לבד! עוברים מחדר לחדר: מביסים את המפלצות כדי לפתוח את השערים, ובסוף מביסים את הבוס ועומדים על שער היציאה. כדורי כוח בדרך נותנים כוחות־על למי שפותר תרגיל! כשהברק מתמלא, לוחצים עליו ופותרים תרגיל למכת־על.';
+  $('#ar-wave').textContent='⚔️';$('#ar-hearts').innerHTML='';
+  var help='מזיזים את הג׳ויסטיק למטה כדי ללכת, והחבר יורה לבד! עוברים מחדר לחדר: מביסים את המפלצות כדי לפתוח את השערים, ובסוף מביסים את הבוס ועומדים על שער היציאה. כדורי כוח בדרך נותנים כלים למי שפותר תרגיל, והם נשמרים עד שמשתמשים בהם! נוגעים בג׳ויסטיק כדי לפתוח את הכלים ואת מכת־העל.';
   var nf=Object.keys(AR_FEAT).filter(function(f){return AR_FEAT[f].k===AR.k});if(nf.length)help+=' ✨ חדש בזירה הזאת: '+nf.map(function(f){return AR_FEAT[f].e+' '+AR_FEAT[f].n}).join(' ו')+'!';
   if(S.set.arTime)help+=' ⏱️ יש '+(S.set.arTime===1?'דקה אחת':S.set.arTime+' דקות')+' להגיע לשער!';
   arOver('<div class="ar-card"><h3>מי יוצא לקרב?</h3><div class="ar-pick">'+AR.fighters.map(function(f,i){return '<button class="ar-fi" data-act="arena-pick" data-i="'+i+'"><img src="'+f.src+'" alt="">'+esc(f.name)+'<small>'+(f.mine?'החבר שלי':'מפלצת '+RNAME[f.r])+'</small>'+(f.lv>1?'<small class="ar-lv">רמה '+f.lv+'</small>':'')+'</button>'}).join('')+'</div><p class="ar-help">'+help+'</p>'+
@@ -2152,13 +2153,15 @@ function arBegin(i){
   a.enImg=arMonImg(a.boss);a.imgs={boss:a.enImg,blob:a.enImg,run:arMonImg(AR_EN.run),tank:arMonImg(AR_EN.tank),spit:arMonImg(AR_EN.spit)};
   a.shake=0;a.flash=0;a.combo=0;a.lastKill=-9;a.dust=0;a.buff={};
   a.tx=null;a.ty=null;a.sx=null;a.down=false;a.hearts=5;a.inv=0;a.cd=.6;a.bul=[];a.eb=[];a.en=[];a.fx=[];
-  a.charge=0;a.CH=5;a.kills=0;a.revives=0;a.t=0;a.last=0;a.paused=false;a.T0=(S.set.arTime||0)*60;a.time=a.T0;a.lost=false;
+  a.bag=S.arBag;a.joy=null;a.jx=0;a.jy=0;a.jm=0;a.ringT=0;a.J={x:W/2,y:H-80*a.s,r:54*a.s};a.charge=0;a.CH=5;a.kills=0;a.revives=0;a.t=0;a.last=0;a.paused=false;a.T0=(S.set.arTime||0)*60;a.time=a.T0;a.lost=false;
   arBuild();
-  cv.addEventListener('pointerdown',function(e){e.preventDefault();if(!AR||AR.paused)return;try{cv.setPointerCapture(e.pointerId)}catch(_){}AR.down=true;arAim(e)});
-  cv.addEventListener('pointermove',function(e){if(AR&&AR.down&&!AR.paused)arAim(e)});
-  cv.addEventListener('pointerup',function(){if(AR)AR.down=false});
-  cv.addEventListener('pointercancel',function(){if(AR)AR.down=false});
-  cv.addEventListener('lostpointercapture',function(){if(AR)AR.down=false});
+  cv.addEventListener('pointerdown',function(e){e.preventDefault();var a=AR;if(!a||a.paused)return;var r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+    var it=arRingHit(x,y);if(it){arUse(it);return} // a tool from the ring around the joystick
+    if(a.joy==null&&Math.hypot(x-a.J.x,y-a.J.y)<a.J.r*1.7){try{cv.setPointerCapture(e.pointerId)}catch(_){}a.joy=e.pointerId;a.down=false;arJoy(x,y);return}
+    if(a.joy!=null)return;try{cv.setPointerCapture(e.pointerId)}catch(_){}a.down=true;arAim(e)}); // tapping the field still walks there
+  cv.addEventListener('pointermove',function(e){var a=AR;if(!a||a.paused)return;if(e.pointerId===a.joy){var r=cv.getBoundingClientRect();arJoy(e.clientX-r.left,e.clientY-r.top)}else if(a.down)arAim(e)});
+  var up=function(e){var a=AR;if(!a)return;if(e.pointerId===a.joy){a.joy=null;a.jm=0;a.tx=null;a.ringT=2.5}else a.down=false};
+  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);cv.addEventListener('lostpointercapture',up);
   arHud();arBanner('🚩 יוצאים לדרך!',1.4);arMusic();Snd.tone(523.25,0,.15,'triangle',.2);Snd.tone(783.99,.15,.25,'triangle',.2);
   a.raf=requestAnimationFrame(arLoop);
 }
@@ -2236,13 +2239,17 @@ function arBuild(){ // a tall world of rooms from the bottom up to the exit; wal
     if(geo==='open'||geo==='pillars'||geo==='corridor')for(j=0;j<2;j++){var rr=(16+Math.random()*8)*s;
       q=spot(rm,rr+10*s,.15,.85,function(){return Math.random()<.5?rr+4*s+Math.random()*W*.1:W-rr-4*s-Math.random()*W*.1});a.obs.push({x:q[0],y:q[1],r:rr,img:pick(deco)})}
   });
-  a.py=WH-H*.12;a.px=W/2;a.cy=WH-H;a.start=a.py;
+  a.py=WH-H*.42;a.px=W/2;a.cy=WH-H;a.start=a.py;
 }
+function arJoy(x,y){var a=AR,dx=x-a.J.x,dy=y-a.J.y,d=Math.hypot(dx,dy)||1; // pull further from the middle = walk faster
+  a.jx=dx/d;a.jy=dy/d;a.jm=Math.min(1,d/a.J.r);if(a.jm<.15)a.jm=0}
+function arRing(){var a=AR,L2=['super'].concat(Object.keys(AR_PW).filter(function(k){return a.bag[k]>0})),n=L2.length,R=104*a.s; // tools in an arc above the joystick
+  return L2.map(function(k,i){var an=-Math.PI/2+(i-(n-1)/2)*.62;return {k:k,x:a.J.x+Math.cos(an)*R,y:a.J.y+Math.sin(an)*R}})}
+function arRingHit(x,y){var a=AR;if(a.joy==null&&!(a.ringT>0))return null;var g=arRing();for(var i=0;i<g.length;i++)if(Math.hypot(x-g[i].x,y-g[i].y)<32*a.s)return g[i].k;return null}
 function arAim(e){var a=AR,r=a.cv.getBoundingClientRect();a.sx=e.clientX-r.left;a.sy=e.clientY-r.top;a.tx=a.sx;a.ty=a.sy+a.cy}
 function arHud(){var a=AR,h='';for(var i=0;i<5;i++)h+=heartSVG(i<a.hearts);$('#ar-hearts').innerHTML=h;
   var R=a.rooms.length,ri=a.ri||0;
   $('#ar-wave').textContent=a.goal.open?'🏁 לשער!':ri>=R-1?'👹 בוס!':'🚪 חדר '+(ri+1)+' מתוך '+(R-1)}
-function arSuperUI(){var a=AR,c=a&&a.CH?a.charge/a.CH:0;$('#ar-fill').style.width=Math.round(c*100)+'%';$('#ar-super').classList.toggle('ready',c>=1)}
 function arBanner(txt,t){AR.banner={txt:txt,t:t,T:t}}
 function arOut(x,y,r,o){var dx=x-o.x,dy=y-o.y,d=Math.hypot(dx,dy)||1,m=r+o.r*.75;return d<m?[o.x+dx/d*m,o.y+dy/d*m]:null} // push a circle out of an obstacle
 function arFx(x,y,col,n){var s=AR.s;for(var i=0;i<n;i++){var an=Math.random()*Math.PI*2,v=(80+Math.random()*140)*s;AR.fx.push({x:x,y:y,vx:Math.cos(an)*v,vy:Math.sin(an)*v,r:(4+Math.random()*5)*s,col:col,t:.55,T:.55})}}
@@ -2253,7 +2260,7 @@ function arLoop(ts){
   try{if(!a.paused)arStep(dt);arDraw()}catch(err){if(window.console)console.error(err)}
 }
 function arHide(){ // the screen was hidden (minimised, another app): forget the finger and pause
-  var a=AR;if(!a||!a.cv||a.won||a.lost)return;a.down=false;a.tx=null;a.sx=null;a.last=0;
+  var a=AR;if(!a||!a.cv||a.won||a.lost)return;a.down=false;a.tx=null;a.sx=null;a.joy=null;a.jm=0;a.last=0;
   if(a.paused)return;a.paused=true;a.hold=true;
   arOver('<div class="ar-card"><h3>⏸️ הפסקה</h3><p class="ar-help">המשחק מחכה לכם.</p><button class="btn sun block" data-act="arena-resume">▶️ ממשיכים!</button></div>');
 }
@@ -2293,8 +2300,10 @@ function arStep(dt){
     if(t0>30&&a.time<=30){arBanner('⏱️ עוד 30 שניות!',1.4);speakText('עוד שלושים שניות!');Snd.tone(660,0,.15,'square',.08);Snd.tone(660,.2,.15,'square',.08)}
     if(a.time<=10&&Math.ceil(a.time)<Math.ceil(t0))Snd.tone(a.time<=3?1046.5:880,0,.08,'square',.07);
     if(a.time<=0){arTimeUp();return}}
+  if(a.ringT>0&&a.joy==null)a.ringT-=dt;
   if(a.down&&a.sx!=null){a.tx=a.sx;a.ty=a.sy+a.cy} // holding the finger still keeps walking that way
   var st=230*s*(a.buff.speed?1.5:1)*dt;
+  if(a.joy!=null){if(a.jm>0){a.tx=a.px+a.jx*400*s;a.ty=a.py+a.jy*400*s;st*=.3+.7*a.jm}else a.tx=null}
   if(a.tx!=null){var dx=a.tx-a.px,dy=a.ty-a.py,d=Math.hypot(dx,dy);
     if(d<=st){a.px=a.tx;a.py=a.ty;if(!a.down)a.tx=null}else{a.px+=dx/d*st;a.py+=dy/d*st}}
   a.px=clamp(a.px,pr,W-pr);a.py=clamp(a.py,pr,a.WH-pr);
@@ -2309,7 +2318,7 @@ function arStep(dt){
     if(d.kind==='key'&&a.keys>0){a.keys--;arOpen(d,'🔓 הדלת נפתחה!');Snd.sparkle(0,6,.3);return}
     if(a.hintT>0)return;a.hintT=2.5;Snd.tone(220,0,.12,'square',.06);
     arBanner(d.kind==='key'?'🔒 צריך מפתח!':d.kind==='lever'?'🕹️ מצאו את הידית!':'👾 קודם מביסים את המפלצות!',1.2)});
-  var ct=clamp(a.py-H*.62,0,a.WH-H);a.cy+=(ct-a.cy)*Math.min(1,dt*5);
+  var ct=clamp(a.py-H*.5,0,a.WH-H);a.cy+=(ct-a.cy)*Math.min(1,dt*5);
   if(a.inv>0)a.inv-=dt;
   var ri=arRoomAt(a.py);if(ri!==a.ri){a.ri=ri;arHud()}
   if(!R[ri].on&&a.t>1.2)arEnter(R[ri]);
@@ -2380,27 +2389,46 @@ function arDamage(e,n,kx,ky){
   if(e.hp>0){Snd.tone(e.crate?180:320,0,.05,e.crate?'square':'triangle',.08);return}
   if(e.crate){arFx(e.x,e.y,'#A0652F',14);a.shake=Math.max(a.shake,4);Snd.noise(0,.25,.25,900,300);Snd.sparkle(.05,5,.3);
     if(a.hearts<4&&Math.random()<.5)a.pk.push({x:e.x,y:e.y,k:'heart',ph:0});else for(var q=0;q<4;q++)a.pk.push({x:e.x+(q-1.5)*16*s,y:e.y+(q%2?8:-8)*s,k:'coin',ph:q});
-    a.charge=Math.min(a.CH,a.charge+1);arSuperUI();return}
+    a.charge=Math.min(a.CH,a.charge+1);return}
   if(e.carrier){a.pk.push({x:e.x,y:e.y,k:'key',ph:0});arBanner('🗝️ המפתח נפל!',1.1)}
   if(e.type==='tank'&&Math.random()<.5)a.pk.push({x:e.x,y:e.y,k:'orb',t:pick(Object.keys(AR_PW)),ph:0});
   a.combo=a.t-a.lastKill<1.8?a.combo+1:1;a.lastKill=a.t;a.shake=Math.max(a.shake,4);
   a.fx.push({ring:1,x:e.x,y:e.y,R:e.r*2.4,t:.3,T:.3,col:'#fff'});
   if(a.combo>=2){a.fx.push({txt:'קומבו x'+a.combo+'!',x:a.px,y:a.py-50*s,vx:0,vy:-50*s,t:.9,T:.9,col:'#FF5C8A',sz:24});Snd.tone(500+a.combo*110,0,.14,'square',.07,900+a.combo*140);
     if(a.combo>=3){L.coins++;S.coins++}}
-  a.kills++;a.charge=Math.min(a.CH,a.charge+(e.boss?a.CH:1));arSuperUI();
+  a.kills++;a.charge=Math.min(a.CH,a.charge+(e.boss?a.CH:1));
   arFx(e.x,e.y,a.boss.c,e.boss?30:12);Snd.tone(520,0,.14,'triangle',.16,1040);Snd.noise(0,.12,.12,1500);
   if(e.boss||a.kills%2===0){var c=e.boss?5:1;L.coins+=c;S.coins+=c;a.fx.push({txt:'+'+c+' 🪙',x:e.x,y:e.y,vx:0,vy:-60*a.s,t:.9,T:.9});later(120,function(){Snd.coin()})}
   if(a.charge>=a.CH&&!a.toldSuper&&!e.boss){a.toldSuper=true;arBanner('⚡ הברק מלא!',1.3);speakText('הברק מלא! לחצו עליו')}
 }
+function arDrawJoy(c,s){var a=AR,J=a.J,ready=a.charge>=a.CH,bagN=0;for(var k in a.bag)bagN+=a.bag[k]||0;
+  var open=a.joy!=null||a.ringT>0;
+  if(!a.won&&!a.lost&&open){c.globalAlpha=a.joy!=null?1:Math.min(1,a.ringT/.4);
+    arRing().forEach(function(it){var sup=it.k==='super',pw=AR_PW[it.k],col=sup?'#FFC940':pw.col,R=27*s*(sup&&ready?1+Math.abs(Math.sin(a.t*5))*.08:1);
+      c.fillStyle=sup&&!ready?'rgba(201,212,227,.95)':'rgba(255,255,255,.96)';c.strokeStyle='#1F2B47';c.lineWidth=3*s;c.beginPath();c.arc(it.x,it.y,R,0,7);c.fill();c.stroke();
+      if(sup){c.strokeStyle=col;c.lineWidth=6*s;c.beginPath();c.arc(it.x,it.y,R-5*s,-Math.PI/2,-Math.PI/2+Math.PI*2*a.charge/a.CH);c.stroke()}
+      else{c.strokeStyle=col;c.lineWidth=4*s;c.beginPath();c.arc(it.x,it.y,R-4*s,0,7);c.stroke()}
+      c.font=Math.round(24*s)+'px sans-serif';c.fillStyle='#000';c.fillText(sup?'⚡':pw.e,it.x,it.y+1*s);
+      if(!sup){var bx=it.x+R*.75,by=it.y-R*.75;c.fillStyle='#EC5B78';c.beginPath();c.arc(bx,by,10*s,0,7);c.fill();c.fillStyle='#fff';c.font='800 '+Math.round(13*s)+'px Rubik,sans-serif';c.fillText(a.bag[it.k],bx,by+1*s)}});
+    c.globalAlpha=1}
+  // the joystick: base + knob
+  c.globalAlpha=a.joy!=null?.95:.7;
+  c.fillStyle='rgba(31,43,71,.28)';c.beginPath();c.arc(J.x,J.y,J.r,0,7);c.fill();
+  c.lineWidth=4*s;c.strokeStyle=ready&&!open?'rgba(255,201,64,'+(.6+Math.sin(a.t*6)*.4).toFixed(2)+')':'rgba(255,255,255,.85)';c.beginPath();c.arc(J.x,J.y,J.r,0,7);c.stroke();
+  var kx=J.x+a.jx*a.jm*J.r*.75,ky=J.y+a.jy*a.jm*J.r*.75;if(a.joy==null){kx=J.x;ky=J.y}
+  c.fillStyle='#fff';c.strokeStyle='#1F2B47';c.lineWidth=3*s;c.beginPath();c.arc(kx,ky,24*s,0,7);c.fill();c.stroke();
+  c.globalAlpha=1;
+  if(!open&&(ready||bagN)){c.font=Math.round(16*s)+'px sans-serif';c.fillStyle='#000';var hint=(ready?'⚡':'')+(bagN?'🎒':'');c.fillText(hint,kx,ky+1*s)}
+}
 function arSuper(){
-  var a=AR;a.charge=0;arSuperUI();
+  var a=AR;a.charge=0;
   a.fx.push({ring:1,x:a.px,y:a.py,R:Math.max(a.W,a.H),t:.7,T:.7});a.shake=16;
   Snd.drum(0,.8);Snd.noise(0,.6,.35,3000,200,'lowpass');Snd.tone(110,0,.6,'sawtooth',.12,40);Snd.sparkle(.1,10,.5);
   a.en.filter(function(e){return e.y>a.cy-40*a.s&&e.y<a.cy+a.H+40*a.s}).forEach(function(e){var dx=e.x-a.px,dy=e.y-a.py,d=Math.hypot(dx,dy)||1;e.kx=dx/d*500*a.s;e.ky=dy/d*500*a.s;arDamage(e,8,0,0)});
   a.en=a.en.filter(function(e){return e.hp>0});
 }
 function arAsk(kind){ // pause the battle and ask an exercise from the current track
-  var a=AR;a.paused=true;a.ask=kind;a.down=false;
+  var a=AR;a.paused=true;a.ask=kind;a.down=false;a.joy=null;a.jm=0;a.tx=null;
   var q=null;for(var i=0;i<15&&!q;i++){q=makeQuestion(L.p,L.seen,L.last);if(q.trace||q.seq)q=null}
   if(!q){q=gAdd(L.p);q.title=NAMES.add}
   RECENT.push(q.key);if(RECENT.length>80)RECENT.shift();
@@ -2419,7 +2447,7 @@ function arAnswer(i){
     Snd.correct();btn.classList.add('ok');bs.forEach(function(b){b.disabled=true});
     var kind=a.ask;
     later(650,function(){if(AR!==a)return;arOver('');a.ask=null;a.paused=false;
-      if(kind==='super')arSuper();else if(kind==='lever')arLever();else if(kind==='power')arPowerUp(a.orbT);else{a.revives++;a.hearts=3;a.inv=2;arHud();arBanner('💪 חוזרים לקרב!',1)}});
+      if(kind==='super')arSuper();else if(kind==='lever')arLever();else if(kind==='power')arGain(a.orbT);else{a.revives++;a.hearts=3;a.inv=2;arHud();arBanner('💪 חוזרים לקרב!',1)}});
   }else{if(!L.missed)recordAnswer(q.type,false,0);L.missed=true;Snd.wrong();btn.classList.add('bad');btn.disabled=true}
 }
 function sandboxArena(k){
@@ -2566,6 +2594,7 @@ function arDraw(){
     c.font=Math.round(Math.min(15*s,mh*.55))+'px sans-serif';c.fillStyle='#000';c.fillText(done?'✔️':AR_ICON[rm.boss?'boss':rm.feat]||'⚔️',mx0+mw/2,y+mh/2+1*s)});
   c.font=Math.round(16*s)+'px sans-serif';c.fillText('🏁',mx0+mw/2,mb-RM.length*mh-12*s);
   if(a.keys>0){c.font='800 '+Math.round(18*s)+'px Rubik,sans-serif';c.fillText('🗝️'+(a.keys>1?'×'+a.keys:''),mx0+mw/2+4*s,mb+16*s)}
+  arDrawJoy(c,s);
   if(a.banner){var b=a.banner;c.globalAlpha=Math.max(0,Math.min(1,b.t/.3,(b.T-b.t)/.15));
     var bf=40*s;c.font='400 '+Math.round(bf)+'px "Secular One",Rubik,sans-serif';var bw2=c.measureText(b.txt).width;if(bw2>W*.9){bf*=W*.9/bw2;c.font='400 '+Math.round(bf)+'px "Secular One",Rubik,sans-serif'}c.lineJoin='round';
     c.lineWidth=8*s;c.strokeStyle='#1F2B47';c.strokeText(b.txt,W/2,H*.38);c.fillStyle='#fff';c.fillText(b.txt,W/2,H*.38);
@@ -3495,8 +3524,7 @@ var ACT={
   'arena-pick':function(t){arBegin(+t.getAttribute('data-i'))},
   'arena-ans':function(t){arAnswer(+t.getAttribute('data-i'))},
   'arena-resume':function(){var a=AR;if(!a||!a.hold)return;a.hold=false;a.paused=false;a.last=0;a.down=false;arOver('');Snd.init();Snd.tap()},
-  'arena-super':function(){var a=AR;if(!a||!a.cv||a.paused||a.won||a.lost)return;if(a.charge<a.CH){Snd.tap();toast('⚡ מנצחים עוד מפלצות כדי למלא את הברק');return}arAsk('super')},
-  'arena-quit':function(){var a=AR;if(a)a.paused=true;if(SANDBOX){confirmBox('לצאת מזירת הניסיון?','חוזרים להגדרות ההורים.','כן, לצאת',function(){sandboxEnd()});return}confirmBox('לצאת מהזירה?','ההתקדמות בשלב הזה לא תישמר.','כן, לצאת',function(){stopArena();clearTimers();L=null;show('map')})},
+    'arena-quit':function(){var a=AR;if(a)a.paused=true;if(SANDBOX){confirmBox('לצאת מזירת הניסיון?','חוזרים להגדרות ההורים.','כן, לצאת',function(){sandboxEnd()});return}confirmBox('לצאת מהזירה?','ההתקדמות בשלב הזה לא תישמר.','כן, לצאת',function(){stopArena();clearTimers();L=null;show('map')})},
   'sandbox-arena':function(t){Snd.init();Snd.tap();sandboxArena(+t.getAttribute('data-w'))},
   'pick-locked':function(){Snd.wrong();toast('החבר הזה עוד נעול 🔒 פותחים חברים בתיבת אוצר בסוף עולם, או ברצף של 7 ימים')},
   road:function(){Snd.tap();show('road')},
